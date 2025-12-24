@@ -1,0 +1,83 @@
+name: 'Release Changelog Builder'
+description: 'A GitHub/Gitea action that builds release notes/changelog from PRs and commits, supporting multiple providers (GitHub, Gitea) with tag annotations and prefix/postfix messages'
+author: 'ravenwolf.org'
+branding:
+  icon: 'award'
+  color: 'green'
+inputs:
+  platform:
+    description: 'Defines the platform the action is run on. Available options: [`github`, `gitea`]. Defaults to auto-detection from environment.'
+    required: false
+  token:
+    description: 'Defines the token to use to execute the git API requests with, uses environment token by default'
+    required: false
+  baseUrl:
+    description: 'Defines the base url for GitHub Enterprise or Gitea self-hosted authentication'
+    required: false
+  owner:
+    description: 'Defines the owner of the repository to create the changelog for'
+    required: false
+  repo:
+    description: 'Defines the repository to create the changelog for'
+    required: false
+  fromTag:
+    description: 'Defines the previous tag to compare against'
+    required: false
+  toTag:
+    description: 'Defines the newly tag created'
+    required: false
+  mode:
+    description: 'Defines the mode used to retrieve the information. Available options: [`PR`, `COMMIT`, `HYBRID`]. Defaults to `PR`.'
+    required: false
+    default: 'PR'
+  configuration:
+    description: 'Defines the relative path to the configuration file.'
+    required: false
+  configurationJson:
+    description: 'Defines the configuration json. If provided, will be preferred over `configuration`.'
+    required: false
+  ignorePreReleases:
+    description: 'Defines if the action will only use full releases to compare against (Only used if fromTag is not defined).'
+    required: false
+    default: 'false'
+  fetchTagAnnotations:
+    description: 'Defines if the action should fetch tag annotation messages'
+    required: false
+    default: 'false'
+  prefixMessage:
+    description: 'Optional message to prepend to the generated changelog'
+    required: false
+  postfixMessage:
+    description: 'Optional message to append to the generated changelog'
+    required: false
+  includeOpen:
+    description: 'Defines if the changelog should include open PRs'
+    required: false
+    default: 'false'
+  failOnError:
+    description: 'Defines if the action should result in a build failure, if an error was discovered'
+    required: false
+    default: 'false'
+outputs:
+  changelog:
+    description: The built release changelog built from the merged pull requests
+  contributors:
+    description: A comma separated list of contributors (usernames) who contributed to the release
+  pull_requests:
+    description: A comma separated list of PR numbers that were merged
+  tag_annotation:
+    description: The tag annotation message if fetchTagAnnotations was enabled
+  owner:
+    description: Specifies the owner of the repository processed
+  repo:
+    description: Describes the repository name, which was processed
+  fromTag:
+    description: Defines the `fromTag` which describes the lower bound to process pull requests for
+  toTag:
+    description: Defines the `toTag` which describes the upper bound to process pull request for
+  failed:
+    description: Defines if there was an issue with the action run, and the changelog may not have been generated correctly. [true, false]
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+
