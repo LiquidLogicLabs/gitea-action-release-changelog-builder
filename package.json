@@ -41,7 +41,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ravenwolf-org/gitea-action-release-changelog-builder"
+    "url": "https://github.com/LiquidLogicLabs/git-changelog-builder-action.git"
   },
   "keywords": [
     "actions",
