@@ -57,7 +57,7 @@ jobs:
 
       - name: Generate release notes
         id: release_notes
-        uses: LiquidLogicLabs/git-changelog-builder-action@main
+        uses: ./
         with:
           mode: "HYBRID"
           configurationJson: |
