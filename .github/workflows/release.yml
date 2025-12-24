@@ -32,7 +32,7 @@ jobs:
         run: npx tsc --noEmit
 
   test:
-    uses: ./.github/workflows/test.yml
+    uses: ./.github/workflows/test.yml@main
 
   release:
     needs: [lint, test]
