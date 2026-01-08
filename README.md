@@ -260,6 +260,13 @@ This action adds:
 - Prefix and postfix message functionality
 - Improved multi-provider abstraction
 
+## Documentation
+
+For developers and contributors:
+
+- **[Development Guide](docs/DEVELOPMENT.md)** - Setup, development workflow, and contributing guidelines
+- **[Testing Guide](docs/TESTING.md)** - Complete testing documentation
+
 ## License
 
 Apache-2.0
