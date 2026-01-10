@@ -38,7 +38,7 @@ async function run(): Promise<void> {
     const failOnError = core.getInput('failOnError') === 'true'
 
     // Get repository path
-    const repositoryPath = process.env.GITHUB_WORKSPACE || process.cwd()
+    const repositoryPath = process.env.GITHUB_WORKSPACE || process.env.GITEA_WORKSPACE || process.cwd()
 
     // Detect platform
     const platform = detectPlatform(platformInput, baseUrlInput)
@@ -50,12 +50,36 @@ async function run(): Promise<void> {
       throw new Error('Token is required. Provide via input or environment variable.')
     }
 
-    // Get owner and repo
-    const owner = ownerInput || github.context.repo.owner
-    const repo = repoInput || github.context.repo.repo
+    // Get owner and repo - handle both GitHub and Gitea contexts
+    let owner = ownerInput
+    let repo = repoInput
 
     if (!owner || !repo) {
-      throw new Error('Owner and repo are required')
+      if (platform === 'gitea') {
+        // Gitea uses GITEA_REPOSITORY environment variable (format: "owner/repo")
+        const giteaRepo = process.env.GITEA_REPOSITORY
+        if (giteaRepo) {
+          const parts = giteaRepo.split('/')
+          if (parts.length === 2) {
+            owner = ownerInput || parts[0]
+            repo = repoInput || parts[1]
+          }
+        }
+      } else {
+        // GitHub uses github.context
+        try {
+          if (github.context && github.context.repo) {
+            owner = ownerInput || github.context.repo.owner
+            repo = repoInput || github.context.repo.repo
+          }
+        } catch (error) {
+          logger.debug(`Failed to get owner/repo from github.context: ${error}`)
+        }
+      }
+    }
+
+    if (!owner || !repo) {
+      throw new Error('Owner and repo are required. Provide via inputs or ensure running in a GitHub/Gitea Actions environment.')
     }
 
     logger.info(`ℹ️ Processing ${owner}/${repo} on ${platform}`)
@@ -92,13 +116,29 @@ async function run(): Promise<void> {
       }
     }
 
-    // If tags not provided, try to get from context
-    if (!toTag && github.context.ref?.startsWith('refs/tags/')) {
-      const tagName = github.context.ref.replace('refs/tags/', '')
-      const tags = await provider.getTags(owner, repo, 200)
-      toTag = tags.find(t => t.name === tagName) || null
-      if (toTag) {
-        toTag = await provider.fillTagInformation(repositoryPath, owner, repo, toTag)
+    // If tags not provided, try to get from context (both GitHub and Gitea)
+    if (!toTag) {
+      let ref: string | undefined
+      if (platform === 'gitea') {
+        ref = process.env.GITEA_REF
+      } else {
+        try {
+          ref = github.context.ref
+        } catch (error) {
+          logger.debug(`Failed to get ref from github.context: ${error}`)
+        }
+      }
+
+      if (ref && ref.startsWith('refs/tags/')) {
+        const tagName = ref.replace('refs/tags/', '')
+        logger.debug(`Detected tag from context: ${tagName}`)
+        const tags = await provider.getTags(owner, repo, 200)
+        toTag = tags.find(t => t.name === tagName) || null
+        if (toTag) {
+          toTag = await provider.fillTagInformation(repositoryPath, owner, repo, toTag)
+        } else {
+          logger.debug(`Tag ${tagName} not found in repository tags`)
+        }
       }
     }
 
