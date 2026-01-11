@@ -101,6 +101,7 @@ describe('detectOwnerRepo', () => {
 
   describe('GITEA_REPOSITORY environment variable', () => {
     it('should detect owner/repo from GITEA_REPOSITORY for Gitea platform', async () => {
+      delete process.env.GITHUB_REPOSITORY // Clear GITHUB_REPOSITORY so GITEA_REPOSITORY is used
       process.env.GITEA_REPOSITORY = 'gitea-owner/gitea-repo'
 
       const result = await detectOwnerRepo(undefined, 'gitea', logger)
