@@ -8,5 +8,7 @@
 TEST_GITHUB_REPO=owner/repo
 
 # Test tags to use for changelog generation
-TEST_GITHUB_FROM_TAG=v0.1.0
-TEST_GITHUB_TO_TAG=v1.0.0
+# Note: fromTag should be older, toTag should be newer
+# Example: v3.6.5 (older) → v3.6.6 (newer/latest)
+TEST_GITHUB_FROM_TAG=v3.6.5
+TEST_GITHUB_TO_TAG=v3.6.6
