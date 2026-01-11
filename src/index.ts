@@ -55,22 +55,37 @@ async function run(): Promise<void> {
     let repo = repoInput
 
     if (!owner || !repo) {
-      if (platform === 'gitea') {
-        // Gitea uses GITEA_REPOSITORY environment variable (format: "owner/repo")
+      // GITHUB_REPOSITORY is available in both GitHub and Gitea Actions (format: "owner/repo")
+      const githubRepo = process.env.GITHUB_REPOSITORY
+      if (githubRepo) {
+        const parts = githubRepo.split('/')
+        if (parts.length === 2) {
+          owner = ownerInput || parts[0]
+          repo = repoInput || parts[1]
+          logger.debug(`Using owner/repo from GITHUB_REPOSITORY: ${owner}/${repo}`)
+        }
+      }
+
+      // Fallback: Try GITEA_REPOSITORY for Gitea (if not already set)
+      if ((!owner || !repo) && platform === 'gitea') {
         const giteaRepo = process.env.GITEA_REPOSITORY
         if (giteaRepo) {
           const parts = giteaRepo.split('/')
           if (parts.length === 2) {
             owner = ownerInput || parts[0]
             repo = repoInput || parts[1]
+            logger.debug(`Using owner/repo from GITEA_REPOSITORY: ${owner}/${repo}`)
           }
         }
-      } else {
-        // GitHub uses github.context
+      }
+
+      // Fallback: Try github.context for GitHub (if not already set)
+      if ((!owner || !repo) && platform === 'github') {
         try {
           if (github.context && github.context.repo) {
             owner = ownerInput || github.context.repo.owner
             repo = repoInput || github.context.repo.repo
+            logger.debug(`Using owner/repo from github.context: ${owner}/${repo}`)
           }
         } catch (error) {
           logger.debug(`Failed to get owner/repo from github.context: ${error}`)
@@ -79,7 +94,15 @@ async function run(): Promise<void> {
     }
 
     if (!owner || !repo) {
-      throw new Error('Owner and repo are required. Provide via inputs or ensure running in a GitHub/Gitea Actions environment.')
+      const envInfo = [
+        `GITHUB_REPOSITORY=${process.env.GITHUB_REPOSITORY || 'not set'}`,
+        `GITEA_REPOSITORY=${process.env.GITEA_REPOSITORY || 'not set'}`,
+        `Platform=${platform}`,
+        `Owner input=${ownerInput || 'not provided'}`,
+        `Repo input=${repoInput || 'not provided'}`
+      ].join(', ')
+      logger.debug(`Environment info: ${envInfo}`)
+      throw new Error(`Owner and repo are required. Provide via inputs or ensure running in a GitHub/Gitea Actions environment. (${envInfo})`)
     }
 
     logger.info(`ℹ️ Processing ${owner}/${repo} on ${platform}`)
