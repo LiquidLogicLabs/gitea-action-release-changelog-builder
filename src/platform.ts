@@ -19,7 +19,7 @@ function isLocalGitRepo(repositoryPath: string): boolean {
 /**
  * Detect the platform from environment variables or input
  */
-export function detectPlatform(inputPlatform?: string, baseUrl?: string, repositoryPath?: string): ProviderPlatform {
+export function detectPlatform(inputPlatform?: string, repositoryPath?: string): ProviderPlatform {
   // If explicitly provided, use it
   if (inputPlatform) {
     if (inputPlatform === 'github' || inputPlatform === 'gitea' || inputPlatform === 'local' || inputPlatform === 'git') {
@@ -31,17 +31,6 @@ export function detectPlatform(inputPlatform?: string, baseUrl?: string, reposit
   // Try to detect from environment variables
   const giteaServerUrl = process.env.GITEA_SERVER_URL
   const githubServerUrl = process.env.GITHUB_SERVER_URL || process.env.GITHUB_API_URL
-
-  // Check baseUrl if provided
-  if (baseUrl) {
-    const url = baseUrl.toLowerCase()
-    if (url.includes('gitea')) {
-      return 'gitea'
-    }
-    if (url.includes('github')) {
-      return 'github'
-    }
-  }
 
   // Check environment variables
   if (giteaServerUrl) {

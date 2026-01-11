@@ -12,6 +12,43 @@ jobs:
     # Runs for workflow_call/workflow_dispatch; tag pushes are not used here
     runs-on: ubuntu-latest
     environment: TEST
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          # Local repo (current repository) test cases
+          - name: 'Local - No tags (both auto-detected)'
+            repo_type: 'local'
+            fromTag_provided: false
+            toTag_provided: false
+          - name: 'Local - FromTag only (toTag auto-detected)'
+            repo_type: 'local'
+            fromTag_provided: true
+            toTag_provided: false
+          - name: 'Local - Both tags specified'
+            repo_type: 'local'
+            fromTag_provided: true
+            toTag_provided: true
+
+          # Remote repo (traefik/traefik) test cases
+          - name: 'Remote - No tags (both auto-detected)'
+            repo_type: 'remote'
+            fromTag_provided: false
+            toTag_provided: false
+          - name: 'Remote - FromTag only (toTag auto-detected)'
+            repo_type: 'remote'
+            fromTag_provided: true
+            toTag_provided: false
+          - name: 'Remote - Both tags specified'
+            repo_type: 'remote'
+            fromTag_provided: true
+            toTag_provided: true
+
+    env:
+      TEST_GITHUB_FROM_TAG: ${{ vars.TEST_GITHUB_FROM_TAG || '' }}
+      TEST_GITHUB_TO_TAG: ${{ vars.TEST_GITHUB_TO_TAG || '' }}
+      TEST_GITHUB_REPO: ${{ vars.TEST_GITHUB_REPO || '' }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -28,17 +65,31 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Run E2E tests
-        env:
-          # GitHub E2E test configuration
-          # Note: GitHub doesn't allow GITHUB_* secrets in environments, so we use TEST_GITHUB_TOKEN
-          # This token is set in TEST environment and provides access to private test repositories
-          TEST_GITHUB_REPO: ${{ vars.TEST_GITHUB_REPO || 'LiquidLogicLabs/gitea-action-release-changelog-builder' }}
-          GITHUB_TOKEN: ${{ secrets.TEST_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          # Gitea E2E test configuration (optional)
-          # Note: GitHub doesn't allow GITHUB_* secrets in environments, so we use TEST_GITEA_TOKEN
-          # This token is set in TEST environment and provides access to private test repositories
-          TEST_GITEA_REPO: ${{ vars.TEST_GITEA_REPO || '' }}
-          TEST_GITEA_URL: ${{ vars.TEST_GITEA_URL || '' }}
-          GITEA_TOKEN: ${{ secrets.TEST_GITEA_TOKEN || '' }}
-        run: npm run test:e2e
+      - name: Skip if test config missing
+        if: |
+          (matrix.scenario.repo_type == 'remote' && env.TEST_GITHUB_REPO == '') ||
+          (matrix.scenario.fromTag_provided == true && env.TEST_GITHUB_FROM_TAG == '') ||
+          (matrix.scenario.toTag_provided == true && env.TEST_GITHUB_TO_TAG == '')
+        run: |
+          echo "⚠️ Skipping E2E: missing required test configuration"
+          echo "Scenario: ${{ matrix.scenario.name }}"
+          echo "Repo Type: ${{ matrix.scenario.repo_type }}"
+          echo "Test Repo: ${{ env.TEST_GITHUB_REPO }}"
+          echo "FromTag: ${{ env.TEST_GITHUB_FROM_TAG }}"
+          echo "ToTag: ${{ env.TEST_GITHUB_TO_TAG }}"
+          exit 0
+
+      - name: Run E2E test - ${{ matrix.scenario.name }}
+        if: |
+          (matrix.scenario.repo_type == 'local' || env.TEST_GITHUB_REPO != '') &&
+          (matrix.scenario.fromTag_provided == false || env.TEST_GITHUB_FROM_TAG != '') &&
+          (matrix.scenario.toTag_provided == false || env.TEST_GITHUB_TO_TAG != '')
+        uses: ./
+        with:
+          platform: github
+          repo: ${{ matrix.scenario.repo_type == 'local' && github.repository || env.TEST_GITHUB_REPO }}
+          mode: PR
+          fromTag: ${{ matrix.scenario.fromTag_provided && env.TEST_GITHUB_FROM_TAG || '' }}
+          toTag: ${{ matrix.scenario.toTag_provided && env.TEST_GITHUB_TO_TAG || '' }}
+          token: ${{ secrets.TEST_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          fetchTagAnnotations: true

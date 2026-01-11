@@ -6,19 +6,13 @@ branding:
   color: 'green'
 inputs:
   platform:
-    description: 'Defines the platform the action is run on. Available options: [`github`, `gitea`]. Defaults to auto-detection from environment.'
+    description: 'Defines the platform the action is run on. Available options: [`github`, `gitea`, `local`, `git`]. Defaults to auto-detection from environment.'
     required: false
   token:
     description: 'Defines the token to use to execute the git API requests with, uses environment token by default'
     required: false
-  baseUrl:
-    description: 'Defines the base url for GitHub Enterprise or Gitea self-hosted authentication'
-    required: false
-  owner:
-    description: 'Defines the owner of the repository to create the changelog for'
-    required: false
   repo:
-    description: 'Defines the repository to create the changelog for'
+    description: 'Defines the repository to create the changelog for (owner/repo or URL). Defaults to the current repository if not provided.'
     required: false
   fromTag:
     description: 'Defines the previous tag to compare against'
@@ -62,6 +56,10 @@ inputs:
     description: 'Enable verbose debug logging'
     required: false
     default: 'false'
+  maxTagsToFetch:
+    description: 'Maximum number of tags to fetch when searching for tags. If a specified tag is not found in the initial batch, more tags will be fetched up to this limit. Defaults to 1000.'
+    required: false
+    default: '1000'
 outputs:
   changelog:
     description: The built release changelog built from the merged pull requests

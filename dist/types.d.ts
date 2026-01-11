@@ -92,8 +92,6 @@ export interface Configuration {
 export interface ActionInputs {
     platform?: 'github' | 'gitea';
     token?: string;
-    baseUrl?: string;
-    owner?: string;
     repo?: string;
     fromTag?: string;
     toTag?: string;
@@ -106,6 +104,7 @@ export interface ActionInputs {
     postfixMessage?: string;
     includeOpen?: boolean;
     failOnError?: boolean;
+    maxTagsToFetch?: number;
 }
 /**
  * Provider platform type

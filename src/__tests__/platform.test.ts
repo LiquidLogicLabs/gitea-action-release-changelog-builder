@@ -45,10 +45,5 @@ describe('platform detection', () => {
     const url = getApiBaseUrl('gitea')
     expect(url).toBe('https://gitea.com')
   })
-
-  it('should use custom baseUrl if provided', () => {
-    const url = getApiBaseUrl('github', 'https://github.example.com/api/v3')
-    expect(url).toBe('https://github.example.com/api/v3')
-  })
 })
 

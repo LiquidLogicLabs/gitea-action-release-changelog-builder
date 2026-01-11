@@ -4,7 +4,7 @@ import {Logger} from './logger'
 import * as github from '@actions/github'
 
 /**
- * Resolve tags from inputs or context
+ * Resolve tags from inputs or auto-detect from repository tags
  * @param provider Provider instance
  * @param owner Repository owner
  * @param repo Repository name
@@ -13,6 +13,7 @@ import * as github from '@actions/github'
  * @param toTagInput Optional toTag input
  * @param platform Platform type
  * @param logger Logger instance
+ * @param maxTagsToFetch Maximum number of tags to fetch (default: 1000)
  * @returns Object with fromTag and toTag
  */
 export async function resolveTags(
@@ -23,31 +24,75 @@ export async function resolveTags(
   fromTagInput: string | undefined,
   toTagInput: string | undefined,
   platform: ProviderPlatform,
-  logger: Logger
+  logger: Logger,
+  maxTagsToFetch: number = 1000
 ): Promise<{fromTag: TagInfo, toTag: TagInfo}> {
   let fromTag: TagInfo | null = null
   let toTag: TagInfo | null = null
 
+  // Initial tag fetch limit (optimistic - most repos have <200 tags)
+  const INITIAL_TAG_LIMIT = 200
+
+  // Get initial batch of tags (sorted by date, newest first)
+  let allTags = await provider.getTags(owner, repo, Math.min(INITIAL_TAG_LIMIT, maxTagsToFetch))
+
+  if (allTags.length === 0) {
+    throw new Error('No tags found in repository')
+  }
+
+  logger.debug(`Fetched ${allTags.length} tags (limit: ${Math.min(INITIAL_TAG_LIMIT, maxTagsToFetch)})`)
+
+  /**
+   * Find a tag by name, fetching more tags if not found (dynamic fetching)
+   */
+  const findTag = async (tagName: string): Promise<TagInfo | null> => {
+    // First try in the current tag list
+    let foundTag = allTags.find((t: TagInfo) => t.name === tagName) || null
+
+    // If not found and we haven't reached max limit, fetch more tags
+    if (!foundTag && allTags.length < maxTagsToFetch) {
+      logger.debug(`Tag '${tagName}' not found in first ${allTags.length} tags, fetching more...`)
+      allTags = await provider.getTags(owner, repo, maxTagsToFetch)
+      logger.debug(`Fetched ${allTags.length} total tags (up to limit: ${maxTagsToFetch})`)
+      foundTag = allTags.find((t: TagInfo) => t.name === tagName) || null
+    }
+
+    return foundTag
+  }
+
   // Get fromTag if provided
   if (fromTagInput) {
-    const tags = await provider.getTags(owner, repo, 200)
-    fromTag = tags.find((t: TagInfo) => t.name === fromTagInput) || null
-    if (fromTag) {
-      fromTag = await provider.fillTagInformation(repositoryPath, owner, repo, fromTag)
+    const foundTag = await findTag(fromTagInput)
+    if (!foundTag) {
+      throw new Error(
+        `Tag '${fromTagInput}' not found in repository. ` +
+        `Searched ${allTags.length} tag(s). ` +
+        `If this is an old tag, try increasing maxTagsToFetch (current: ${maxTagsToFetch}).`
+      )
     }
+    fromTag = foundTag
+    fromTag = await provider.fillTagInformation(repositoryPath, owner, repo, fromTag)
+    logger.info(`✓ Using provided fromTag: ${fromTag.name}`)
   }
 
   // Get toTag if provided
   if (toTagInput) {
-    const tags = await provider.getTags(owner, repo, 200)
-    toTag = tags.find((t: TagInfo) => t.name === toTagInput) || null
-    if (toTag) {
-      toTag = await provider.fillTagInformation(repositoryPath, owner, repo, toTag)
+    const foundTag = await findTag(toTagInput)
+    if (!foundTag) {
+      throw new Error(
+        `Tag '${toTagInput}' not found in repository. ` +
+        `Searched ${allTags.length} tag(s). ` +
+        `If this is an old tag, try increasing maxTagsToFetch (current: ${maxTagsToFetch}).`
+      )
     }
+    toTag = foundTag
+    toTag = await provider.fillTagInformation(repositoryPath, owner, repo, toTag)
+    logger.info(`✓ Using provided toTag: ${toTag.name}`)
   }
 
-  // If tags not provided, try to get from context (both GitHub and Gitea)
+  // Auto-detect toTag if not provided
   if (!toTag) {
+    // Try to get from context first (for backwards compatibility with tag push events)
     let ref: string | undefined
     if (platform === 'gitea') {
       ref = process.env.GITEA_REF
@@ -62,35 +107,37 @@ export async function resolveTags(
     if (ref && ref.startsWith('refs/tags/')) {
       const tagName = ref.replace('refs/tags/', '')
       logger.debug(`Detected tag from context: ${tagName}`)
-      const tags = await provider.getTags(owner, repo, 200)
-      toTag = tags.find((t: TagInfo) => t.name === tagName) || null
-      if (toTag) {
+      const foundTag = await findTag(tagName)
+      if (foundTag) {
+        toTag = foundTag
         toTag = await provider.fillTagInformation(repositoryPath, owner, repo, toTag)
-      } else {
-        logger.debug(`Tag ${tagName} not found in repository tags`)
+        logger.info(`✓ Using toTag from context: ${toTag.name}`)
       }
+    }
+
+    // If not found in context, use the latest tag (first in the sorted list)
+    if (!toTag) {
+      toTag = allTags[0] // Latest tag (newest first)
+      toTag = await provider.fillTagInformation(repositoryPath, owner, repo, toTag)
+      logger.info(`✓ Auto-detected toTag (latest): ${toTag.name}`)
     }
   }
 
-  if (!toTag) {
-    throw new Error('toTag is required. Provide via input or ensure running on a tag.')
-  }
-
-  // Find fromTag if not provided
+  // Auto-detect fromTag if not provided (find the tag before toTag)
   if (!fromTag) {
-    const tags = await provider.getTags(owner, repo, 200)
-    // Find the tag before toTag
-    const toTagIndex = tags.findIndex((t: TagInfo) => t.name === toTag!.name)
-    if (toTagIndex >= 0 && toTagIndex < tags.length - 1) {
-      fromTag = tags[toTagIndex + 1]
-      if (fromTag) {
-        fromTag = await provider.fillTagInformation(repositoryPath, owner, repo, fromTag)
-      }
+    const toTagIndex = allTags.findIndex((t: TagInfo) => t.name === toTag!.name)
+    if (toTagIndex >= 0 && toTagIndex < allTags.length - 1) {
+      // Tags are sorted newest first, so the previous tag is at index + 1
+      fromTag = allTags[toTagIndex + 1]
+      fromTag = await provider.fillTagInformation(repositoryPath, owner, repo, fromTag)
+      logger.info(`✓ Auto-detected fromTag (previous): ${fromTag.name}`)
+    } else {
+      throw new Error(
+        `Could not determine fromTag: no tag found before ${toTag.name}. ` +
+        `Searched ${allTags.length} tag(s). ` +
+        `If ${toTag.name} is not the latest tag, try increasing maxTagsToFetch (current: ${maxTagsToFetch}).`
+      )
     }
-  }
-
-  if (!fromTag) {
-    throw new Error('Could not determine fromTag')
   }
 
   return {fromTag, toTag}

@@ -47,9 +47,9 @@ describe('detectOwnerRepo', () => {
 
   describe('with inputs provided', () => {
     it('should use provided owner and repo', async () => {
-      const result = await detectOwnerRepo('input-owner', 'input-repo', 'github', logger)
+      const result = await detectOwnerRepo('input-owner/input-repo', 'github', logger)
       expect(result).toEqual({owner: 'input-owner', repo: 'input-repo'})
-      expect(core.debug).not.toHaveBeenCalled()
+      expect(core.debug).toHaveBeenCalledWith('Using owner/repo from repo input: input-owner/input-repo')
     })
   })
 
@@ -57,7 +57,7 @@ describe('detectOwnerRepo', () => {
     it('should detect owner/repo from GITHUB_REPOSITORY when inputs not provided', async () => {
       process.env.GITHUB_REPOSITORY = 'env-owner/env-repo'
 
-      const result = await detectOwnerRepo(undefined, undefined, 'github', logger)
+      const result = await detectOwnerRepo(undefined, 'github', logger)
 
       expect(result).toEqual({owner: 'env-owner', repo: 'env-repo'})
       expect(core.debug).toHaveBeenCalledWith(
@@ -68,16 +68,16 @@ describe('detectOwnerRepo', () => {
     it('should prefer input owner/repo over GITHUB_REPOSITORY', async () => {
       process.env.GITHUB_REPOSITORY = 'env-owner/env-repo'
 
-      const result = await detectOwnerRepo('input-owner', 'input-repo', 'github', logger)
+      const result = await detectOwnerRepo('input-owner/input-repo', 'github', logger)
 
       expect(result).toEqual({owner: 'input-owner', repo: 'input-repo'})
-      expect(core.debug).not.toHaveBeenCalled()
+      expect(core.debug).toHaveBeenCalledWith('Using owner/repo from repo input: input-owner/input-repo')
     })
 
     it('should work for Gitea platform with GITHUB_REPOSITORY', async () => {
       process.env.GITHUB_REPOSITORY = 'gitea-owner/gitea-repo'
 
-      const result = await detectOwnerRepo(undefined, undefined, 'gitea', logger)
+      const result = await detectOwnerRepo(undefined, 'gitea', logger)
 
       expect(result).toEqual({owner: 'gitea-owner', repo: 'gitea-repo'})
       expect(core.debug).toHaveBeenCalledWith(
@@ -92,7 +92,7 @@ describe('detectOwnerRepo', () => {
         repo: 'context-repo',
       }
 
-      const result = await detectOwnerRepo(undefined, undefined, 'github', logger)
+      const result = await detectOwnerRepo(undefined, 'github', logger)
 
       // Should fall back to github.context
       expect(result).toEqual({owner: 'context-owner', repo: 'context-repo'})
@@ -103,7 +103,7 @@ describe('detectOwnerRepo', () => {
     it('should detect owner/repo from GITEA_REPOSITORY for Gitea platform', async () => {
       process.env.GITEA_REPOSITORY = 'gitea-owner/gitea-repo'
 
-      const result = await detectOwnerRepo(undefined, undefined, 'gitea', logger)
+      const result = await detectOwnerRepo(undefined, 'gitea', logger)
 
       expect(result).toEqual({owner: 'gitea-owner', repo: 'gitea-repo'})
       expect(core.debug).toHaveBeenCalledWith(
@@ -115,7 +115,7 @@ describe('detectOwnerRepo', () => {
       process.env.GITHUB_REPOSITORY = 'github-owner/github-repo'
       process.env.GITEA_REPOSITORY = 'gitea-owner/gitea-repo'
 
-      const result = await detectOwnerRepo(undefined, undefined, 'gitea', logger)
+      const result = await detectOwnerRepo(undefined, 'gitea', logger)
 
       expect(result).toEqual({owner: 'github-owner', repo: 'github-repo'})
       expect(core.debug).toHaveBeenCalledWith(
@@ -131,7 +131,7 @@ describe('detectOwnerRepo', () => {
         repo: 'context-repo',
       }
 
-      const result = await detectOwnerRepo(undefined, undefined, 'github', logger)
+      const result = await detectOwnerRepo(undefined, 'github', logger)
 
       // Should use github.context instead
       expect(result).toEqual({owner: 'context-owner', repo: 'context-repo'})
@@ -146,7 +146,7 @@ describe('detectOwnerRepo', () => {
         repo: 'context-repo',
       }
 
-      const result = await detectOwnerRepo(undefined, undefined, 'github', logger)
+      const result = await detectOwnerRepo(undefined, 'github', logger)
 
       expect(result).toEqual({owner: 'context-owner', repo: 'context-repo'})
       expect(core.debug).toHaveBeenCalledWith(
@@ -158,7 +158,7 @@ describe('detectOwnerRepo', () => {
       delete process.env.GITHUB_REPOSITORY
       delete mockContext.repo
 
-      await expect(detectOwnerRepo(undefined, undefined, 'github', logger)).rejects.toThrow('Owner and repo are required')
+      await expect(detectOwnerRepo(undefined, 'github', logger)).rejects.toThrow('Owner and repo are required')
     })
 
     it('should not use github.context for Gitea platform', async () => {
@@ -169,7 +169,7 @@ describe('detectOwnerRepo', () => {
         repo: 'context-repo',
       }
 
-      await expect(detectOwnerRepo(undefined, undefined, 'gitea', logger)).rejects.toThrow('Owner and repo are required')
+      await expect(detectOwnerRepo(undefined, 'gitea', logger)).rejects.toThrow('Owner and repo are required')
     })
   })
 
@@ -179,7 +179,7 @@ describe('detectOwnerRepo', () => {
       delete process.env.GITEA_REPOSITORY
       delete mockContext.repo
 
-      await expect(detectOwnerRepo(undefined, undefined, 'github', logger)).rejects.toThrow('Owner and repo are required')
+      await expect(detectOwnerRepo(undefined, 'github', logger)).rejects.toThrow('Owner and repo are required')
 
       expect(core.debug).toHaveBeenCalledWith(
         expect.stringContaining('Environment info:')
@@ -192,13 +192,12 @@ describe('detectOwnerRepo', () => {
       delete mockContext.repo
 
       try {
-        await detectOwnerRepo(undefined, undefined, 'github', logger)
+        await detectOwnerRepo(undefined, 'github', logger)
         expect(true).toBe(false) // Should have thrown error
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
         expect(errorMessage).toContain('GITHUB_REPOSITORY=not set')
         expect(errorMessage).toContain('Platform=github')
-        expect(errorMessage).toContain('Owner input=not provided')
         expect(errorMessage).toContain('Repo input=not provided')
       }
     })

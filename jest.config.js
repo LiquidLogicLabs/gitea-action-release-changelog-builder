@@ -8,10 +8,14 @@ module.exports = {
   transform: {
     '^.+\\.tsx?$': 'ts-jest'
   },
+  // Exclude E2E Jest suite (E2E now runs via workflow using the built action)
+  testPathIgnorePatterns: ['__tests__/e2e/'],
   // For E2E tests with real APIs, we need to handle ES modules in node_modules
-  // @octokit/rest is ESM-only, so we need to tell Jest to ignore it during transformation
-  // but allow it to be loaded at runtime
+  // @octokit/* packages are ESM-only, so we need to tell Jest to NOT transform them
+  // transformIgnorePatterns: patterns that MATCH are NOT transformed
+  // Using separate patterns for each package (simpler and more reliable)
   transformIgnorePatterns: [
-    'node_modules/(?!(@octokit|gitea-js)/)'
+    'node_modules/@octokit',
+    'node_modules/gitea-js'
   ]
 }

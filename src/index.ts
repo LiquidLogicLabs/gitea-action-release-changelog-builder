@@ -28,8 +28,6 @@ export async function run(): Promise<void> {
     // Read inputs
     const platformInput = core.getInput('platform')
     const tokenInput = core.getInput('token')
-    const baseUrlInput = core.getInput('baseUrl')
-    const ownerInput = core.getInput('owner')
     const repoInput = core.getInput('repo')
     const fromTagInput = core.getInput('fromTag')
     const toTagInput = core.getInput('toTag')
@@ -42,19 +40,21 @@ export async function run(): Promise<void> {
     const postfixMessage = core.getInput('postfixMessage')
     const includeOpen = core.getInput('includeOpen') === 'true'
     const failOnError = core.getInput('failOnError') === 'true'
+    const maxTagsToFetchInput = core.getInput('maxTagsToFetch')
+    const maxTagsToFetch = maxTagsToFetchInput ? parseInt(maxTagsToFetchInput, 10) : 1000
 
     // Get repository path
     const repositoryPath = process.env.GITHUB_WORKSPACE || process.env.GITEA_WORKSPACE || process.cwd()
 
     // Detect platform
-    const platform = detectPlatform(platformInput, baseUrlInput, repositoryPath)
-    const baseUrl = getApiBaseUrl(platform, baseUrlInput)
+    const platform = detectPlatform(platformInput, repositoryPath)
+    const baseUrl = getApiBaseUrl(platform)
 
     // Get token
     const token = detectToken(platform, tokenInput)
 
     // Get owner and repo - handle both GitHub and Gitea contexts
-    const {owner, repo} = await detectOwnerRepo(ownerInput, repoInput, platform, logger)
+    const {owner, repo} = await detectOwnerRepo(repoInput, platform, logger)
 
     logger.info(`ℹ️ Processing ${owner}/${repo} on ${platform}`)
     logger.debug(`Platform: ${platform}, Base URL: ${baseUrl}, Owner: ${owner}, Repo: ${repo}`)
@@ -79,7 +79,8 @@ export async function run(): Promise<void> {
       fromTagInput,
       toTagInput,
       platform,
-      logger
+      logger,
+      maxTagsToFetch
     )
 
     logger.info(`ℹ️ Comparing ${fromTag.name}...${toTag.name}`)

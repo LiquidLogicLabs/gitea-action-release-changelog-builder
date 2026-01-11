@@ -63,11 +63,9 @@ A GitHub/Gitea Action that builds release notes/changelog from pull requests and
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `platform` | No | Auto-detected | Platform: `github` or `gitea` |
+| `platform` | No | Auto-detected | Platform: `github`, `gitea`, `local`, or `git` |
 | `token` | No | Environment token | Authentication token |
-| `baseUrl` | No | Platform default | Custom API base URL (for Enterprise/self-hosted) |
-| `owner` | No | Context owner | Repository owner |
-| `repo` | No | Context repo | Repository name |
+| `repo` | No | Current repo | Repository to use (owner/repo or URL). Defaults to current repo if omitted. |
 | `fromTag` | No* | Previous tag | Previous tag to compare from |
 | `toTag` | No* | Current tag | New tag to compare to |
 | `mode` | No | `PR` | Mode: `PR`, `COMMIT`, or `HYBRID` |
@@ -80,6 +78,7 @@ A GitHub/Gitea Action that builds release notes/changelog from pull requests and
 | `includeOpen` | No | `false` | Include open pull requests |
 | `failOnError` | No | `false` | Fail the action on errors |
 | `verbose` | No | `false` | Enable verbose debug logging |
+| `maxTagsToFetch` | No | `1000` | Maximum number of tags to fetch when searching for tags. If a specified tag is not found in the initial batch (200 tags), more tags will be fetched up to this limit |
 
 \* Either `fromTag`/`toTag` must be provided, or the action must run on a tag
 
@@ -150,19 +149,7 @@ You can also explicitly specify the platform using the `platform` input.
 
 ## Self-Hosted Gitea
 
-For self-hosted Gitea instances, provide the `baseUrl`:
-
-```yaml
-- name: Build Changelog
-  uses: LiquidLogicLabs/git-changelog-builder-action@v1
-  with:
-    platform: gitea
-    baseUrl: https://gitea.example.com
-    fromTag: v1.0.0
-    toTag: v1.1.0
-  env:
-    GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
-```
+For self-hosted Gitea or GitHub Enterprise, the action auto-detects the base URL when provided by the runner (e.g., `GITHUB_SERVER_URL`/`GITHUB_API_URL` for GHES, `GITEA_SERVER_URL` for Gitea). If none are present, it falls back to the standard public endpoints (`https://api.github.com` for GitHub, `https://gitea.com` for Gitea). No `baseUrl` input is needed.
 
 ## Tag Annotations
 

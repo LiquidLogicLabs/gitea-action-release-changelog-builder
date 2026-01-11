@@ -57,8 +57,6 @@ async function run() {
         // Read inputs
         const platformInput = core.getInput('platform');
         const tokenInput = core.getInput('token');
-        const baseUrlInput = core.getInput('baseUrl');
-        const ownerInput = core.getInput('owner');
         const repoInput = core.getInput('repo');
         const fromTagInput = core.getInput('fromTag');
         const toTagInput = core.getInput('toTag');
@@ -71,15 +69,17 @@ async function run() {
         const postfixMessage = core.getInput('postfixMessage');
         const includeOpen = core.getInput('includeOpen') === 'true';
         const failOnError = core.getInput('failOnError') === 'true';
+        const maxTagsToFetchInput = core.getInput('maxTagsToFetch');
+        const maxTagsToFetch = maxTagsToFetchInput ? parseInt(maxTagsToFetchInput, 10) : 1000;
         // Get repository path
         const repositoryPath = process.env.GITHUB_WORKSPACE || process.env.GITEA_WORKSPACE || process.cwd();
         // Detect platform
-        const platform = (0, platform_1.detectPlatform)(platformInput, baseUrlInput, repositoryPath);
-        const baseUrl = (0, platform_1.getApiBaseUrl)(platform, baseUrlInput);
+        const platform = (0, platform_1.detectPlatform)(platformInput, repositoryPath);
+        const baseUrl = (0, platform_1.getApiBaseUrl)(platform);
         // Get token
         const token = (0, token_1.detectToken)(platform, tokenInput);
         // Get owner and repo - handle both GitHub and Gitea contexts
-        const { owner, repo } = await (0, context_1.detectOwnerRepo)(ownerInput, repoInput, platform, logger);
+        const { owner, repo } = await (0, context_1.detectOwnerRepo)(repoInput, platform, logger);
         logger.info(`ℹ️ Processing ${owner}/${repo} on ${platform}`);
         logger.debug(`Platform: ${platform}, Base URL: ${baseUrl}, Owner: ${owner}, Repo: ${repo}`);
         // Validate mode for local/git platform (COMMIT only)
@@ -91,7 +91,7 @@ async function run() {
         // Resolve configuration
         const config = (0, config_1.resolveConfiguration)(repositoryPath, configurationJson, configurationFile);
         // Resolve tags
-        const { fromTag, toTag } = await (0, tags_1.resolveTags)(provider, owner, repo, repositoryPath, fromTagInput, toTagInput, platform, logger);
+        const { fromTag, toTag } = await (0, tags_1.resolveTags)(provider, owner, repo, repositoryPath, fromTagInput, toTagInput, platform, logger, maxTagsToFetch);
         logger.info(`ℹ️ Comparing ${fromTag.name}...${toTag.name}`);
         // Fetch tag annotation if requested
         let tagAnnotation = null;

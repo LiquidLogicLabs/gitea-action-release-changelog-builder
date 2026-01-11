@@ -38,6 +38,7 @@ coverage/
 .act-event-*.json
 .act.*
 !.act.*.example
-# Note: .act.env and .act.secrets are safe to commit (they're templates with commented values)
-# If you uncomment and add secrets, consider adding them to .gitignore
+!.act.*.sample
+# Note: .act.*.sample files are templates and safe to commit
+# .act.vars and .act.secrets are ignored and should contain actual values
 

@@ -10,16 +10,27 @@ export interface OwnerRepo {
 }
 
 /**
- * Detect owner and repo from various sources (inputs, environment variables, context)
+ * Detect owner and repo from various sources (input repo string, environment variables, context)
  */
 export async function detectOwnerRepo(
-  ownerInput: string | undefined,
   repoInput: string | undefined,
   platform: ProviderPlatform,
   logger: Logger
 ): Promise<OwnerRepo> {
-  let owner = ownerInput
-  let repo = repoInput
+  let owner: string | undefined
+  let repo: string | undefined
+
+  // If repo input provided, try to parse owner/repo from it (supports URL or owner/repo)
+  if (repoInput) {
+    const parsed = parseRepo(repoInput)
+    if (parsed) {
+      owner = parsed.owner
+      repo = parsed.repo
+      logger.debug(`Using owner/repo from repo input: ${owner}/${repo}`)
+    } else {
+      logger.debug(`Failed to parse repo input: ${repoInput}`)
+    }
+  }
 
   if (!owner || !repo) {
     // GITHUB_REPOSITORY is available in both GitHub and Gitea Actions (format: "owner/repo")
@@ -27,8 +38,8 @@ export async function detectOwnerRepo(
     if (githubRepo) {
       const parts = githubRepo.split('/')
       if (parts.length === 2) {
-        owner = ownerInput || parts[0]
-        repo = repoInput || parts[1]
+        owner = parts[0]
+        repo = parts[1]
         logger.debug(`Using owner/repo from GITHUB_REPOSITORY: ${owner}/${repo}`)
       }
     }
@@ -39,8 +50,8 @@ export async function detectOwnerRepo(
       if (giteaRepo) {
         const parts = giteaRepo.split('/')
         if (parts.length === 2) {
-          owner = ownerInput || parts[0]
-          repo = repoInput || parts[1]
+          owner = parts[0]
+          repo = parts[1]
           logger.debug(`Using owner/repo from GITEA_REPOSITORY: ${owner}/${repo}`)
         }
       }
@@ -50,8 +61,8 @@ export async function detectOwnerRepo(
     if ((!owner || !repo) && platform === 'github') {
       try {
         if (github.context && github.context.repo) {
-          owner = ownerInput || github.context.repo.owner
-          repo = repoInput || github.context.repo.repo
+          owner = github.context.repo.owner
+          repo = github.context.repo.repo
           logger.debug(`Using owner/repo from github.context: ${owner}/${repo}`)
         }
       } catch (error) {
@@ -88,8 +99,8 @@ export async function detectOwnerRepo(
         if (gitRemoteUrl) {
           const match = gitRemoteUrl.match(/(?:git@|https?:\/\/)(?:[\w.-]+@)?([\w.-]+)[\/:]([\w.-]+)\/([\w.-]+)(?:\.git)?/)
           if (match && match[2] && match[3]) {
-            owner = ownerInput || match[2]
-            repo = repoInput || match[3].replace(/\.git$/, '')
+            owner = match[2]
+            repo = match[3].replace(/\.git$/, '')
             logger.debug(`Using owner/repo from git remote.origin.url: ${owner}/${repo}`)
           }
         }
@@ -99,8 +110,8 @@ export async function detectOwnerRepo(
           const workspace = process.env.GITHUB_WORKSPACE || process.env.GITEA_WORKSPACE || ''
           const workspaceName = path.basename(workspace)
           if (workspaceName) {
-            repo = repoInput || workspaceName
-            owner = ownerInput || 'local'
+            repo = workspaceName
+            owner = 'local'
             logger.debug(`Using owner/repo from workspace path: ${owner}/${repo}`)
           }
         }
@@ -115,14 +126,39 @@ export async function detectOwnerRepo(
       `GITHUB_REPOSITORY=${process.env.GITHUB_REPOSITORY || 'not set'}`,
       `GITEA_REPOSITORY=${process.env.GITEA_REPOSITORY || 'not set'}`,
       `Platform=${platform}`,
-      `Owner input=${ownerInput || 'not provided'}`,
       `Repo input=${repoInput || 'not provided'}`
     ].join(', ')
     logger.debug(`Environment info: ${envInfo}`)
     throw new Error(
-      `Owner and repo are required. Provide via inputs or ensure running in a GitHub/Gitea Actions environment. (${envInfo})`
+      `Owner and repo are required. Provide via repo input (owner/repo or URL) or ensure running in a GitHub/Gitea Actions environment. (${envInfo})`
     )
   }
 
   return {owner, repo}
+}
+
+/**
+ * Parse a repository string into owner/repo.
+ * Supports:
+ * - owner/repo
+ * - https://github.com/owner/repo(.git)
+ * - git@github.com:owner/repo(.git)
+ */
+function parseRepo(repoInput: string): OwnerRepo | null {
+  const trimmed = repoInput.trim()
+  if (!trimmed) return null
+
+  // URL or SSH formats
+  const urlMatch = trimmed.match(/^(?:https?:\/\/|git@)([^/:]+)[/:]([^/]+)\/([^/]+?)(?:\.git)?$/)
+  if (urlMatch) {
+    return {owner: urlMatch[2], repo: urlMatch[3]}
+  }
+
+  // owner/repo format
+  const parts = trimmed.split('/')
+  if (parts.length === 2 && parts[0] && parts[1]) {
+    return {owner: parts[0], repo: parts[1].replace(/\.git$/, '')}
+  }
+
+  return null
 }

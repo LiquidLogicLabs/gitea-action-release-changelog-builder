@@ -56,7 +56,7 @@ describe('E2E Tests', () => {
   })
 
   describe('GitHub E2E Tests', () => {
-    const testRepo = process.env.TEST_GITHUB_REPO || 'LiquidLogicLabs/gitea-action-release-changelog-builder'
+    const testRepo = process.env.TEST_GITHUB_REPO || 'LiquidLogicLabs/git-action-release-changelog-builder'
     const githubToken = process.env.GITHUB_TOKEN || process.env.TEST_GITHUB_TOKEN
 
     if (!githubToken) {
@@ -133,8 +133,6 @@ describe('E2E Tests', () => {
       mockGetInput.mockImplementation((name: string) => {
         if (name === 'token') return giteaToken || ''
         if (name === 'platform') return 'gitea'
-        if (name === 'baseUrl') return giteaUrl
-        if (name === 'owner') return owner
         if (name === 'repo') return repo
         if (name === 'mode') return 'PR'
         if (name === 'fromTag') return 'v1.0.0'
