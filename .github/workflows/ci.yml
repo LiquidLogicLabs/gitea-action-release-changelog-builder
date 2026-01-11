@@ -3,10 +3,17 @@ name: CI
 on:
   push:
     branches: ['**']
+    tags-ignore: ['**']  # Ignore tag pushes (handled by release workflow)
+    paths-ignore:
+      - 'docs/**'  # Skip CI for documentation-only changes
+      - '.act*'  # Skip CI for local act configuration changes (sample files are committed)
   pull_request:
     branches: ['**']
-  workflow_call:  # Allow CI to be called by release workflow
-  workflow_dispatch:  # Allow manual triggering
+    paths-ignore:
+      - 'docs/**'  # Skip CI for documentation-only changes
+      - '.act*'  # Skip CI for local act configuration changes (sample files are committed)
+  workflow_call:  # Allow CI to be called by release workflow (not affected by paths-ignore)
+  workflow_dispatch:  # Allow manual triggering (not affected by paths-ignore)
 
 permissions:
   contents: read
