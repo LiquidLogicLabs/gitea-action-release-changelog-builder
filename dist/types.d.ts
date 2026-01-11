@@ -84,6 +84,7 @@ export interface Configuration {
     categories?: Category[];
     ignore_labels?: string[];
     trim_values?: boolean;
+    defaultCategory?: string;
 }
 /**
  * Action input types
@@ -109,4 +110,5 @@ export interface ActionInputs {
 /**
  * Provider platform type
  */
-export type ProviderPlatform = 'github' | 'gitea';
+export type ProviderPlatform = 'github' | 'gitea' | 'local' | 'git';
+//# sourceMappingURL=types.d.ts.map

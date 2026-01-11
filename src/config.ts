@@ -30,7 +30,8 @@ export const DefaultConfiguration: Configuration = {
     }
   ],
   ignore_labels: [],
-  trim_values: true
+  trim_values: true,
+  defaultCategory: '## Other Changes'
 }
 
 /**
@@ -78,7 +79,8 @@ function mergeWithDefaults(userConfig: Partial<Configuration>): Configuration {
     empty_template: userConfig.empty_template ?? DefaultConfiguration.empty_template,
     categories: userConfig.categories ?? DefaultConfiguration.categories,
     ignore_labels: userConfig.ignore_labels ?? DefaultConfiguration.ignore_labels,
-    trim_values: userConfig.trim_values ?? DefaultConfiguration.trim_values
+    trim_values: userConfig.trim_values ?? DefaultConfiguration.trim_values,
+    defaultCategory: userConfig.defaultCategory ?? DefaultConfiguration.defaultCategory
   }
 }
 

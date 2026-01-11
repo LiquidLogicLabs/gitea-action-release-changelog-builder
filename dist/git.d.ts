@@ -13,3 +13,4 @@ export declare function tagExists(repositoryPath: string, tag: string): Promise<
  * Get the commit SHA that a tag points to
  */
 export declare function getTagCommit(repositoryPath: string, tag: string): Promise<string | null>;
+//# sourceMappingURL=git.d.ts.map

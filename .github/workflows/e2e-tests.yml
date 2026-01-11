@@ -1,0 +1,44 @@
+name: E2E Tests
+
+on:
+  workflow_call:  # Called by release workflow
+  workflow_dispatch:  # Manual trigger only
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    # Runs for workflow_call/workflow_dispatch; tag pushes are not used here
+    runs-on: ubuntu-latest
+    environment: TEST
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run E2E tests
+        env:
+          # GitHub E2E test configuration
+          # Note: GitHub doesn't allow GITHUB_* secrets in environments, so we use TEST_GITHUB_TOKEN
+          # This token is set in TEST environment and provides access to private test repositories
+          TEST_GITHUB_REPO: ${{ vars.TEST_GITHUB_REPO || 'LiquidLogicLabs/gitea-action-release-changelog-builder' }}
+          GITHUB_TOKEN: ${{ secrets.TEST_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          # Gitea E2E test configuration (optional)
+          # Note: GitHub doesn't allow GITHUB_* secrets in environments, so we use TEST_GITEA_TOKEN
+          # This token is set in TEST environment and provides access to private test repositories
+          TEST_GITEA_REPO: ${{ vars.TEST_GITEA_REPO || '' }}
+          TEST_GITEA_URL: ${{ vars.TEST_GITEA_URL || '' }}
+          GITEA_TOKEN: ${{ secrets.TEST_GITEA_TOKEN || '' }}
+        run: npm run test:e2e

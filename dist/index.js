@@ -32,19 +32,22 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.run = run;
 const core = __importStar(require("@actions/core"));
-const github = __importStar(require("@actions/github"));
-const github_1 = require("./providers/github");
-const gitea_1 = require("./providers/gitea");
+const factory_1 = require("./providers/factory");
 const platform_1 = require("./platform");
 const config_1 = require("./config");
 const changelog_1 = require("./changelog");
+const context_1 = require("./context");
+const token_1 = require("./token");
+const tags_1 = require("./tags");
+const collector_1 = require("./collector");
 const logger_1 = require("./logger");
-const moment_1 = __importDefault(require("moment"));
+/**
+ * Main entry point for the action
+ * Exported for testing purposes
+ */
 async function run() {
     try {
         // Get verbose input and create logger
@@ -71,138 +74,24 @@ async function run() {
         // Get repository path
         const repositoryPath = process.env.GITHUB_WORKSPACE || process.env.GITEA_WORKSPACE || process.cwd();
         // Detect platform
-        const platform = (0, platform_1.detectPlatform)(platformInput, baseUrlInput);
+        const platform = (0, platform_1.detectPlatform)(platformInput, baseUrlInput, repositoryPath);
         const baseUrl = (0, platform_1.getApiBaseUrl)(platform, baseUrlInput);
         // Get token
-        const token = tokenInput || process.env.GITHUB_TOKEN || process.env.GITEA_TOKEN || '';
-        if (!token) {
-            throw new Error('Token is required. Provide via input or environment variable.');
-        }
+        const token = (0, token_1.detectToken)(platform, tokenInput);
         // Get owner and repo - handle both GitHub and Gitea contexts
-        let owner = ownerInput;
-        let repo = repoInput;
-        if (!owner || !repo) {
-            // GITHUB_REPOSITORY is available in both GitHub and Gitea Actions (format: "owner/repo")
-            const githubRepo = process.env.GITHUB_REPOSITORY;
-            if (githubRepo) {
-                const parts = githubRepo.split('/');
-                if (parts.length === 2) {
-                    owner = ownerInput || parts[0];
-                    repo = repoInput || parts[1];
-                    logger.debug(`Using owner/repo from GITHUB_REPOSITORY: ${owner}/${repo}`);
-                }
-            }
-            // Fallback: Try GITEA_REPOSITORY for Gitea (if not already set)
-            if ((!owner || !repo) && platform === 'gitea') {
-                const giteaRepo = process.env.GITEA_REPOSITORY;
-                if (giteaRepo) {
-                    const parts = giteaRepo.split('/');
-                    if (parts.length === 2) {
-                        owner = ownerInput || parts[0];
-                        repo = repoInput || parts[1];
-                        logger.debug(`Using owner/repo from GITEA_REPOSITORY: ${owner}/${repo}`);
-                    }
-                }
-            }
-            // Fallback: Try github.context for GitHub (if not already set)
-            if ((!owner || !repo) && platform === 'github') {
-                try {
-                    if (github.context && github.context.repo) {
-                        owner = ownerInput || github.context.repo.owner;
-                        repo = repoInput || github.context.repo.repo;
-                        logger.debug(`Using owner/repo from github.context: ${owner}/${repo}`);
-                    }
-                }
-                catch (error) {
-                    logger.debug(`Failed to get owner/repo from github.context: ${error}`);
-                }
-            }
-        }
-        if (!owner || !repo) {
-            const envInfo = [
-                `GITHUB_REPOSITORY=${process.env.GITHUB_REPOSITORY || 'not set'}`,
-                `GITEA_REPOSITORY=${process.env.GITEA_REPOSITORY || 'not set'}`,
-                `Platform=${platform}`,
-                `Owner input=${ownerInput || 'not provided'}`,
-                `Repo input=${repoInput || 'not provided'}`
-            ].join(', ');
-            logger.debug(`Environment info: ${envInfo}`);
-            throw new Error(`Owner and repo are required. Provide via inputs or ensure running in a GitHub/Gitea Actions environment. (${envInfo})`);
-        }
+        const { owner, repo } = await (0, context_1.detectOwnerRepo)(ownerInput, repoInput, platform, logger);
         logger.info(`ℹ️ Processing ${owner}/${repo} on ${platform}`);
         logger.debug(`Platform: ${platform}, Base URL: ${baseUrl}, Owner: ${owner}, Repo: ${repo}`);
-        // Initialize provider
-        let provider;
-        if (platform === 'github') {
-            provider = new github_1.GithubProvider(token, baseUrl, repositoryPath);
+        // Validate mode for local/git platform (COMMIT only)
+        if ((platform === 'local' || platform === 'git') && (modeInput === 'PR' || modeInput === 'HYBRID')) {
+            throw new Error(`PR and HYBRID modes are not supported for ${platform} platform. Use COMMIT mode instead.`);
         }
-        else {
-            provider = new gitea_1.GiteaProvider(token, baseUrl, repositoryPath);
-        }
+        // Initialize provider via factory
+        const provider = (0, factory_1.createProvider)(platform, token, baseUrl, repositoryPath);
         // Resolve configuration
         const config = (0, config_1.resolveConfiguration)(repositoryPath, configurationJson, configurationFile);
         // Resolve tags
-        let fromTag = null;
-        let toTag = null;
-        if (fromTagInput) {
-            const tags = await provider.getTags(owner, repo, 200);
-            fromTag = tags.find(t => t.name === fromTagInput) || null;
-            if (fromTag) {
-                fromTag = await provider.fillTagInformation(repositoryPath, owner, repo, fromTag);
-            }
-        }
-        if (toTagInput) {
-            const tags = await provider.getTags(owner, repo, 200);
-            toTag = tags.find(t => t.name === toTagInput) || null;
-            if (toTag) {
-                toTag = await provider.fillTagInformation(repositoryPath, owner, repo, toTag);
-            }
-        }
-        // If tags not provided, try to get from context (both GitHub and Gitea)
-        if (!toTag) {
-            let ref;
-            if (platform === 'gitea') {
-                ref = process.env.GITEA_REF;
-            }
-            else {
-                try {
-                    ref = github.context.ref;
-                }
-                catch (error) {
-                    logger.debug(`Failed to get ref from github.context: ${error}`);
-                }
-            }
-            if (ref && ref.startsWith('refs/tags/')) {
-                const tagName = ref.replace('refs/tags/', '');
-                logger.debug(`Detected tag from context: ${tagName}`);
-                const tags = await provider.getTags(owner, repo, 200);
-                toTag = tags.find(t => t.name === tagName) || null;
-                if (toTag) {
-                    toTag = await provider.fillTagInformation(repositoryPath, owner, repo, toTag);
-                }
-                else {
-                    logger.debug(`Tag ${tagName} not found in repository tags`);
-                }
-            }
-        }
-        if (!toTag) {
-            throw new Error('toTag is required. Provide via input or ensure running on a tag.');
-        }
-        // Find fromTag if not provided
-        if (!fromTag) {
-            const tags = await provider.getTags(owner, repo, 200);
-            // Find the tag before toTag
-            const toTagIndex = tags.findIndex(t => t.name === toTag.name);
-            if (toTagIndex >= 0 && toTagIndex < tags.length - 1) {
-                fromTag = tags[toTagIndex + 1];
-                if (fromTag) {
-                    fromTag = await provider.fillTagInformation(repositoryPath, owner, repo, fromTag);
-                }
-            }
-        }
-        if (!fromTag) {
-            throw new Error('Could not determine fromTag');
-        }
+        const { fromTag, toTag } = await (0, tags_1.resolveTags)(provider, owner, repo, repositoryPath, fromTagInput, toTagInput, platform, logger);
         logger.info(`ℹ️ Comparing ${fromTag.name}...${toTag.name}`);
         // Fetch tag annotation if requested
         let tagAnnotation = null;
@@ -215,45 +104,7 @@ async function run() {
             }
         }
         // Collect pull requests based on mode
-        let pullRequests = [];
-        if (modeInput === 'PR' || modeInput === 'HYBRID') {
-            // Get PRs between dates
-            const fromDate = fromTag.date || (0, moment_1.default)().subtract(365, 'days');
-            const toDate = toTag.date || (0, moment_1.default)();
-            const mergedPRs = await provider.getBetweenDates(owner, repo, fromDate, toDate, 200);
-            pullRequests.push(...mergedPRs);
-            if (includeOpen) {
-                const openPRs = await provider.getOpen(owner, repo, 200);
-                pullRequests.push(...openPRs);
-            }
-        }
-        if (modeInput === 'COMMIT' || modeInput === 'HYBRID') {
-            // Get commits and convert to PR-like structure
-            const commits = await provider.getCommits(owner, repo, fromTag.name, toTag.name);
-            // Convert commits to PR-like structure
-            for (const commit of commits) {
-                pullRequests.push({
-                    number: 0, // Commits don't have PR numbers
-                    title: commit.message.split('\n')[0],
-                    htmlURL: commit.htmlURL,
-                    baseBranch: '',
-                    branch: '',
-                    createdAt: commit.date,
-                    mergedAt: commit.date,
-                    mergeCommitSha: commit.sha,
-                    author: commit.author,
-                    authorName: commit.authorName,
-                    repoName: `${owner}/${repo}`,
-                    labels: [],
-                    milestone: '',
-                    body: commit.message,
-                    assignees: [],
-                    requestedReviewers: [],
-                    approvedReviewers: [],
-                    status: 'merged'
-                });
-            }
-        }
+        const pullRequests = await (0, collector_1.collectPullRequests)(provider, owner, repo, fromTag, toTag, modeInput, includeOpen, platform, logger);
         logger.info(`ℹ️ Found ${pullRequests.length} items to include in changelog`);
         logger.debug(`Mode: ${modeInput}, Pull requests: ${pullRequests.length}`);
         // Generate changelog

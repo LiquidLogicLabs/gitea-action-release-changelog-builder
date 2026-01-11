@@ -67,7 +67,8 @@ exports.DefaultConfiguration = {
         }
     ],
     ignore_labels: [],
-    trim_values: true
+    trim_values: true,
+    defaultCategory: '## Other Changes'
 };
 /**
  * Parse configuration from JSON string
@@ -112,7 +113,8 @@ function mergeWithDefaults(userConfig) {
         empty_template: userConfig.empty_template ?? exports.DefaultConfiguration.empty_template,
         categories: userConfig.categories ?? exports.DefaultConfiguration.categories,
         ignore_labels: userConfig.ignore_labels ?? exports.DefaultConfiguration.ignore_labels,
-        trim_values: userConfig.trim_values ?? exports.DefaultConfiguration.trim_values
+        trim_values: userConfig.trim_values ?? exports.DefaultConfiguration.trim_values,
+        defaultCategory: userConfig.defaultCategory ?? exports.DefaultConfiguration.defaultCategory
     };
 }
 /**

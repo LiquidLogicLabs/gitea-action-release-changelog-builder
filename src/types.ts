@@ -91,6 +91,7 @@ export interface Configuration {
   categories?: Category[]
   ignore_labels?: string[]
   trim_values?: boolean
+  defaultCategory?: string
 }
 
 /**
@@ -118,5 +119,5 @@ export interface ActionInputs {
 /**
  * Provider platform type
  */
-export type ProviderPlatform = 'github' | 'gitea'
+export type ProviderPlatform = 'github' | 'gitea' | 'local' | 'git'
 

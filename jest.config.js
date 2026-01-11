@@ -7,6 +7,11 @@ module.exports = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   transform: {
     '^.+\\.tsx?$': 'ts-jest'
-  }
+  },
+  // For E2E tests with real APIs, we need to handle ES modules in node_modules
+  // @octokit/rest is ESM-only, so we need to tell Jest to ignore it during transformation
+  // but allow it to be loaded at runtime
+  transformIgnorePatterns: [
+    'node_modules/(?!(@octokit|gitea-js)/)'
+  ]
 }
-

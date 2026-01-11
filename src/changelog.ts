@@ -48,7 +48,7 @@ export function generateChangelog(
   // Handle uncategorized PRs
   const uncategorized = categorized.get('__uncategorized__') || []
   if (uncategorized.length > 0) {
-    sections.push('## Other Changes')
+    sections.push(config.defaultCategory || '## Other Changes')
     sections.push('')
     
     for (const pr of uncategorized) {
