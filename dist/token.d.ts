@@ -6,4 +6,3 @@ import { ProviderPlatform } from './types';
  * @returns Token string (empty string for local/git platforms)
  */
 export declare function detectToken(platform: ProviderPlatform, tokenInput?: string): string;
-//# sourceMappingURL=token.d.ts.map
