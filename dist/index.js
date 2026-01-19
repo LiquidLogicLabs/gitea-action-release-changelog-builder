@@ -42125,6 +42125,10 @@ function generateChangelog(pullRequests, config, tagAnnotation, prefixMessage, p
     }
     // Build main changelog content
     let changelog = sections.join('\n').trim();
+    // If nothing was generated, use empty template fallback
+    if (!changelog) {
+        changelog = config.empty_template ?? '- no changes';
+    }
     // Apply template if provided
     if (config.template) {
         changelog = applyTemplate(config.template, changelog, pullRequests);
@@ -42861,17 +42865,25 @@ const logger_1 = __nccwpck_require__(6999);
  * Exported for testing purposes
  */
 async function run() {
+    // Keep these available for graceful error handling
+    let resolvedConfig;
+    let resolvedPrefixMessage;
+    let resolvedPostfixMessage;
+    const normalizeOptional = (value) => {
+        const trimmed = value.trim();
+        return trimmed ? trimmed : undefined;
+    };
     try {
         // Get verbose input and create logger
         const verbose = core.getBooleanInput('verbose');
         const logger = new logger_1.Logger(verbose);
         core.setOutput('failed', 'false');
         // Read inputs
-        const platformInput = core.getInput('platform');
-        const tokenInput = core.getInput('token');
-        const repoInput = core.getInput('repo');
-        const fromTagInput = core.getInput('fromTag');
-        const toTagInput = core.getInput('toTag');
+        const platformInput = normalizeOptional(core.getInput('platform') || '');
+        const tokenInput = normalizeOptional(core.getInput('token') || '');
+        const repoInput = normalizeOptional(core.getInput('repo') || '');
+        const fromTagInput = normalizeOptional(core.getInput('fromTag') || '');
+        const toTagInput = normalizeOptional(core.getInput('toTag') || '');
         const modeInput = core.getInput('mode') || 'PR';
         const configurationJson = core.getInput('configurationJson');
         const configurationFile = core.getInput('configuration');
@@ -42902,6 +42914,9 @@ async function run() {
         const provider = (0, factory_1.createProvider)(platform, token, baseUrl, repositoryPath);
         // Resolve configuration
         const config = (0, config_1.resolveConfiguration)(repositoryPath, configurationJson, configurationFile);
+        resolvedConfig = config;
+        resolvedPrefixMessage = prefixMessage || undefined;
+        resolvedPostfixMessage = postfixMessage || undefined;
         // Resolve tags
         const { fromTag, toTag } = await (0, tags_1.resolveTags)(provider, owner, repo, repositoryPath, fromTagInput, toTagInput, platform, logger, maxTagsToFetch);
         logger.info(`ℹ️ Comparing ${fromTag.name}...${toTag.name}`);
@@ -42945,6 +42960,29 @@ async function run() {
         const verbose = core.getBooleanInput('verbose');
         const logger = new logger_1.Logger(verbose);
         const failOnError = core.getInput('failOnError') === 'true';
+        // Graceful fallback: always emit a non-empty changelog output so downstream steps
+        // (like release creation) don't end up with an empty body.
+        try {
+            const cfg = resolvedConfig ?? (0, config_1.resolveConfiguration)(process.cwd(), core.getInput('configurationJson'), core.getInput('configuration'));
+            const isNoTags = /no tags found in repository/i.test(errorMessage);
+            const fallback = isNoTags
+                ? `⚠️ ${errorMessage}\n\n${cfg.empty_template ?? '- no changes'}`
+                : `⚠️ Changelog generation failed: ${errorMessage}`;
+            // Include prefix/postfix if we have them, and apply the template consistently.
+            const fallbackChangelog = (0, changelog_1.generateChangelog)([], { ...cfg, empty_template: fallback }, null, resolvedPrefixMessage, resolvedPostfixMessage);
+            core.setOutput('changelog', fallbackChangelog);
+            // These may be unknown in error cases; emit empty values instead of omitting.
+            core.setOutput('owner', '');
+            core.setOutput('repo', '');
+            core.setOutput('fromTag', '');
+            core.setOutput('toTag', '');
+            core.setOutput('contributors', '');
+            core.setOutput('pull_requests', '');
+        }
+        catch {
+            // If even fallback generation fails, ensure at least changelog is set.
+            core.setOutput('changelog', `⚠️ Changelog generation failed: ${errorMessage}`);
+        }
         if (failOnError) {
             logger.error(errorMessage);
             core.setFailed(errorMessage);
@@ -44187,14 +44225,17 @@ async function resolveTags(provider, owner, repo, repositoryPath, fromTagInput, 
      * Find a tag by name, fetching more tags if not found (dynamic fetching)
      */
     const findTag = async (tagName) => {
+        const normalizedTagName = tagName.trim();
+        if (!normalizedTagName)
+            return null;
         // First try in the current tag list
-        let foundTag = allTags.find((t) => t.name === tagName) || null;
+        let foundTag = allTags.find((t) => t.name === normalizedTagName) || null;
         // If not found and we haven't reached max limit, fetch more tags
         if (!foundTag && allTags.length < maxTagsToFetch) {
-            logger.debug(`Tag '${tagName}' not found in first ${allTags.length} tags, fetching more...`);
+            logger.debug(`Tag '${normalizedTagName}' not found in first ${allTags.length} tags, fetching more...`);
             allTags = await provider.getTags(owner, repo, maxTagsToFetch);
             logger.debug(`Fetched ${allTags.length} total tags (up to limit: ${maxTagsToFetch})`);
-            foundTag = allTags.find((t) => t.name === tagName) || null;
+            foundTag = allTags.find((t) => t.name === normalizedTagName) || null;
         }
         return foundTag;
     };
@@ -44214,13 +44255,15 @@ async function resolveTags(provider, owner, repo, repositoryPath, fromTagInput, 
     if (toTagInput) {
         const foundTag = await findTag(toTagInput);
         if (!foundTag) {
-            throw new Error(`Tag '${toTagInput}' not found in repository. ` +
-                `Searched ${allTags.length} tag(s). ` +
-                `If this is an old tag, try increasing maxTagsToFetch (current: ${maxTagsToFetch}).`);
+            // Graceful fallback: if user provided a toTag but we can't find it, fall back to auto-detection.
+            logger.warning(`⚠️ toTag '${toTagInput}' not found in repository. Falling back to latest tag. ` +
+                `Searched ${allTags.length} tag(s).`);
         }
-        toTag = foundTag;
-        toTag = await provider.fillTagInformation(repositoryPath, owner, repo, toTag);
-        logger.info(`✓ Using provided toTag: ${toTag.name}`);
+        else {
+            toTag = foundTag;
+            toTag = await provider.fillTagInformation(repositoryPath, owner, repo, toTag);
+            logger.info(`✓ Using provided toTag: ${toTag.name}`);
+        }
     }
     // Auto-detect toTag if not provided
     if (!toTag) {

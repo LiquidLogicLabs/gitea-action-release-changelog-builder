@@ -129,11 +129,12 @@ describe('generateChangelog', () => {
   })
 
   it('should handle empty PR list', () => {
-    const result = generateChangelog([], mockConfig)
-    // Result should contain at least the template
-    expect(result).toBeDefined()
-    // With empty PRs, we should still have template rendering
-    expect(result.length).toBeGreaterThanOrEqual(0)
+    const configWithEmpty: Configuration = {
+      ...mockConfig,
+      empty_template: '- no changes'
+    }
+    const result = generateChangelog([], configWithEmpty)
+    expect(result).toBe('- no changes')
   })
 
   it('should replace PR template placeholders', () => {

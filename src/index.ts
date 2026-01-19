@@ -12,12 +12,23 @@ import {TagInfo, PullRequestInfo} from './types'
 import {Logger} from './logger'
 import moment from 'moment'
 import * as path from 'path'
+import {Configuration} from './types'
 
 /**
  * Main entry point for the action
  * Exported for testing purposes
  */
 export async function run(): Promise<void> {
+  // Keep these available for graceful error handling
+  let resolvedConfig: Configuration | undefined
+  let resolvedPrefixMessage: string | undefined
+  let resolvedPostfixMessage: string | undefined
+
+  const normalizeOptional = (value: string): string | undefined => {
+    const trimmed = value.trim()
+    return trimmed ? trimmed : undefined
+  }
+
   try {
     // Get verbose input and create logger
     const verbose = core.getBooleanInput('verbose')
@@ -26,11 +37,11 @@ export async function run(): Promise<void> {
     core.setOutput('failed', 'false')
 
     // Read inputs
-    const platformInput = core.getInput('platform')
-    const tokenInput = core.getInput('token')
-    const repoInput = core.getInput('repo')
-    const fromTagInput = core.getInput('fromTag')
-    const toTagInput = core.getInput('toTag')
+    const platformInput = normalizeOptional(core.getInput('platform') || '')
+    const tokenInput = normalizeOptional(core.getInput('token') || '')
+    const repoInput = normalizeOptional(core.getInput('repo') || '')
+    const fromTagInput = normalizeOptional(core.getInput('fromTag') || '')
+    const toTagInput = normalizeOptional(core.getInput('toTag') || '')
     const modeInput = core.getInput('mode') || 'PR'
     const configurationJson = core.getInput('configurationJson')
     const configurationFile = core.getInput('configuration')
@@ -69,6 +80,9 @@ export async function run(): Promise<void> {
 
     // Resolve configuration
     const config = resolveConfiguration(repositoryPath, configurationJson, configurationFile)
+    resolvedConfig = config
+    resolvedPrefixMessage = prefixMessage || undefined
+    resolvedPostfixMessage = postfixMessage || undefined
 
     // Resolve tags
     const {fromTag, toTag} = await resolveTags(
@@ -149,6 +163,38 @@ export async function run(): Promise<void> {
     const logger = new Logger(verbose)
     
     const failOnError = core.getInput('failOnError') === 'true'
+
+    // Graceful fallback: always emit a non-empty changelog output so downstream steps
+    // (like release creation) don't end up with an empty body.
+    try {
+      const cfg = resolvedConfig ?? resolveConfiguration(process.cwd(), core.getInput('configurationJson'), core.getInput('configuration'))
+      const isNoTags = /no tags found in repository/i.test(errorMessage)
+      const fallback = isNoTags
+        ? `⚠️ ${errorMessage}\n\n${cfg.empty_template ?? '- no changes'}`
+        : `⚠️ Changelog generation failed: ${errorMessage}`
+
+      // Include prefix/postfix if we have them, and apply the template consistently.
+      const fallbackChangelog = generateChangelog(
+        [],
+        {...cfg, empty_template: fallback},
+        null,
+        resolvedPrefixMessage,
+        resolvedPostfixMessage
+      )
+
+      core.setOutput('changelog', fallbackChangelog)
+      // These may be unknown in error cases; emit empty values instead of omitting.
+      core.setOutput('owner', '')
+      core.setOutput('repo', '')
+      core.setOutput('fromTag', '')
+      core.setOutput('toTag', '')
+      core.setOutput('contributors', '')
+      core.setOutput('pull_requests', '')
+    } catch {
+      // If even fallback generation fails, ensure at least changelog is set.
+      core.setOutput('changelog', `⚠️ Changelog generation failed: ${errorMessage}`)
+    }
+
     if (failOnError) {
       logger.error(errorMessage)
       core.setFailed(errorMessage)

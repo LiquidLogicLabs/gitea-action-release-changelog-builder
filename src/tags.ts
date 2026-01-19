@@ -46,15 +46,18 @@ export async function resolveTags(
    * Find a tag by name, fetching more tags if not found (dynamic fetching)
    */
   const findTag = async (tagName: string): Promise<TagInfo | null> => {
+    const normalizedTagName = tagName.trim()
+    if (!normalizedTagName) return null
+
     // First try in the current tag list
-    let foundTag = allTags.find((t: TagInfo) => t.name === tagName) || null
+    let foundTag = allTags.find((t: TagInfo) => t.name === normalizedTagName) || null
 
     // If not found and we haven't reached max limit, fetch more tags
     if (!foundTag && allTags.length < maxTagsToFetch) {
-      logger.debug(`Tag '${tagName}' not found in first ${allTags.length} tags, fetching more...`)
+      logger.debug(`Tag '${normalizedTagName}' not found in first ${allTags.length} tags, fetching more...`)
       allTags = await provider.getTags(owner, repo, maxTagsToFetch)
       logger.debug(`Fetched ${allTags.length} total tags (up to limit: ${maxTagsToFetch})`)
-      foundTag = allTags.find((t: TagInfo) => t.name === tagName) || null
+      foundTag = allTags.find((t: TagInfo) => t.name === normalizedTagName) || null
     }
 
     return foundTag
@@ -79,15 +82,16 @@ export async function resolveTags(
   if (toTagInput) {
     const foundTag = await findTag(toTagInput)
     if (!foundTag) {
-      throw new Error(
-        `Tag '${toTagInput}' not found in repository. ` +
-        `Searched ${allTags.length} tag(s). ` +
-        `If this is an old tag, try increasing maxTagsToFetch (current: ${maxTagsToFetch}).`
+      // Graceful fallback: if user provided a toTag but we can't find it, fall back to auto-detection.
+      logger.warning(
+        `⚠️ toTag '${toTagInput}' not found in repository. Falling back to latest tag. ` +
+          `Searched ${allTags.length} tag(s).`
       )
+    } else {
+      toTag = foundTag
+      toTag = await provider.fillTagInformation(repositoryPath, owner, repo, toTag)
+      logger.info(`✓ Using provided toTag: ${toTag.name}`)
     }
-    toTag = foundTag
-    toTag = await provider.fillTagInformation(repositoryPath, owner, repo, toTag)
-    logger.info(`✓ Using provided toTag: ${toTag.name}`)
   }
 
   // Auto-detect toTag if not provided

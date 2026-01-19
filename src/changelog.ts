@@ -62,6 +62,11 @@ export function generateChangelog(
   // Build main changelog content
   let changelog = sections.join('\n').trim()
 
+  // If nothing was generated, use empty template fallback
+  if (!changelog) {
+    changelog = config.empty_template ?? '- no changes'
+  }
+
   // Apply template if provided
   if (config.template) {
     changelog = applyTemplate(config.template, changelog, pullRequests)
