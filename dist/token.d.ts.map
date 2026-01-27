@@ -1,1 +1,1 @@
-{"version":3,"file":"","sourceRoot":"","sources":["file:///home/ravenwolf.org/sanderson/source/git/LiquidLogicLabs/actions/git-action-release-changelog-builder/src/token.ts"],"names":[],"mappings":"AAAA,OAAO,EAAC,gBAAgB,EAAC,MAAM,SAAS,CAAA;AAExC;;;;;GAKG;AACH,wBAAgB,WAAW,CAAC,QAAQ,EAAE,gBAAgB,EAAE,UAAU,CAAC,EAAE,MAAM,GAAG,MAAM,CAyBnF"}
+{"version":3,"file":"token.d.ts","sourceRoot":"","sources":["../src/token.ts"],"names":[],"mappings":"AAAA,OAAO,EAAC,gBAAgB,EAAC,MAAM,SAAS,CAAA;AAExC;;;;;GAKG;AACH,wBAAgB,WAAW,CAAC,QAAQ,EAAE,gBAAgB,EAAE,UAAU,CAAC,EAAE,MAAM,GAAG,MAAM,CAyBnF"}

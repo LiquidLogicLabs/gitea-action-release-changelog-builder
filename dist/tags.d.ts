@@ -18,3 +18,4 @@ export declare function resolveTags(provider: BaseProvider, owner: string, repo:
     fromTag: TagInfo;
     toTag: TagInfo;
 }>;
+//# sourceMappingURL=tags.d.ts.map

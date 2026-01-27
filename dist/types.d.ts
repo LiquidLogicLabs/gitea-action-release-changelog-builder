@@ -110,3 +110,4 @@ export interface ActionInputs {
  * Provider platform type
  */
 export type ProviderPlatform = 'github' | 'gitea' | 'local' | 'git';
+//# sourceMappingURL=types.d.ts.map
