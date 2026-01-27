@@ -1,6 +1,6 @@
 {
   "name": "release-changelog-builder-action",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "A GitHub/Gitea action that builds release notes/changelog from PRs and commits, supporting multiple providers (GitHub, Gitea) with tag annotations and prefix/postfix messages",
   "private": true,
   "type": "commonjs",
