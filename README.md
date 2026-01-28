@@ -1,4 +1,4 @@
-# git-changelog-builder-action
+# Release Changelog Builder
 
 A GitHub/Gitea Action that builds release notes/changelog from pull requests and commits, supporting multiple providers (GitHub, Gitea) with tag annotations and prefix/postfix messages.
 
