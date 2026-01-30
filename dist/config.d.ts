@@ -15,4 +15,3 @@ export declare function loadConfigurationFromFile(repositoryPath: string, config
  * Resolve configuration from input (JSON string or file path)
  */
 export declare function resolveConfiguration(repositoryPath: string, configJson?: string, configFile?: string): Configuration;
-//# sourceMappingURL=config.d.ts.map

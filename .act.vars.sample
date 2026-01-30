@@ -1,2 +1,8 @@
 # Workflow vars for act (used as vars.* in workflows).
-# Most repos can leave this empty.
+# Copy to .act.vars and set values for local E2E runs.
+# In CI, these are set in the repo's TEST environment (Environment variables).
+
+# E2E tests (e2e-tests.yml) - optional; without these, only "Local - No tags" runs.
+# TEST_GITHUB_REPO=owner/repo
+# TEST_GITHUB_FROM_TAG=v1.0.0
+# TEST_GITHUB_TO_TAG=v2.0.0

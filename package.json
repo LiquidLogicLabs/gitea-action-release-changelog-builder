@@ -26,7 +26,7 @@
     "type-check": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.ts\"",
     "format-check": "prettier --check \"src/**/*.ts\"",
-    "prepare": "npm run build && husky install",
+    "prepare": "husky install",
     "release:patch": "standard-version --release-as patch --skip.changelog && git push --follow-tags",
     "release:minor": "standard-version --release-as minor --skip.changelog && git push --follow-tags",
     "release:major": "standard-version --release-as major --skip.changelog && git push --follow-tags",

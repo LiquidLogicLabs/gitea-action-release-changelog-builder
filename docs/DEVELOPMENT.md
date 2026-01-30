@@ -27,17 +27,21 @@ npm install
 
 1. Create a branch from `main`
 2. Make your changes following coding standards
-3. Test locally: `npm test && npm run lint && npm run build`
-4. Commit with clear messages (consider Conventional Commits)
-5. Push and create a Pull Request
+3. Test locally: `npm test && npm run lint && npm run package`
+4. (Optional) Run E2E locally with [act](https://github.com/nektos/act): `npm run test:act:e2e` — see [TESTING.md](./TESTING.md#e2e-tests-workflow-run-locally-with-act)
+5. Commit with clear messages (consider Conventional Commits)
+6. Push and create a Pull Request
 
 ### Available Scripts
 
 ```bash
-npm run build          # Compile TypeScript and bundle
-npm test               # Run all tests
+npm run build          # Compile TypeScript only (outputs to dist/)
+npm run package        # Build and bundle with ncc (single self-contained dist/index.js) — required for release
+npm test               # Run all tests (unit + integration)
 npm run test:watch     # Run tests in watch mode
 npm run test:coverage  # Generate coverage report
+npm run test:act:e2e  # Run E2E workflow locally with act (requires Docker + .act.env, .act.vars, .act.secrets)
+npm run test:act:ci   # Run CI workflow locally with act
 npm run lint           # Run ESLint
 npm run format         # Format code with Prettier
 npm run release:patch  # Create patch release
@@ -56,9 +60,10 @@ This project uses `standard-version` for automated release tag creation with com
 ### Pre-Release Checklist
 
 1. All local tests pass: `npm test`
-2. Build succeeds: `npm run build`
-3. Linter passes: `npm run lint`
-4. CI workflow has passed
+2. Linter passes: `npm run lint`
+3. Package the action: `npm run package` (produces self-contained dist/index.js with ncc)
+4. Commit `dist/` if changed (the release workflow verifies the committed dist is the ncc bundle)
+5. CI workflow has passed
 
 ### Creating a Release
 

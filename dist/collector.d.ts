@@ -23,4 +23,3 @@ export declare function convertCommitsToPRs(commits: CommitInfo[], owner: string
  * @returns Array of PR-like info
  */
 export declare function collectPullRequests(provider: BaseProvider, owner: string, repo: string, fromTag: TagInfo, toTag: TagInfo, mode: string, includeOpen: boolean, platform: ProviderPlatform, logger: Logger): Promise<PullRequestInfo[]>;
-//# sourceMappingURL=collector.d.ts.map
